@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>لعبة الرسم البكسلية</title>
+    <style>
+        /* إعدادات الصفحة الأساسية لمنع التمرير */
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #222;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            font-family: sans-serif;
+        }
+
+        /* منطقة الرسم (اللوحة) */
+        canvas {
+            background-color: #fff;
+            flex-grow: 1; /* تأخذ باقي مساحة الشاشة */
+            touch-action: none; /* ضروري لمنع المتصفح من تحريك الصفحة أثناء الرسم */
+            cursor: crosshair;
+        }
+
+        /* شريط الأدوات في الأسفل */
+        .toolbar {
+            background-color: #333;
+            padding: 10px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border-top: 2px solid #00ffcc;
+        }
+
+        /* أزرار الألوان */
+        .color-btn {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            cursor: pointer;
+        }
+
+        .active-color {
+            border: 3px solid #00ffcc; /* تمييز اللون النشط */
+            transform: scale(1.1);
+        }
+
+        /* زر المسح */
+        .clear-btn {
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* شريط التحكم في حجم القلم */
+        .size-picker {
+            width: 80px;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="paintCanvas"></canvas>
+
+    <div class="toolbar">
+        <div class="color-btn" style="background: black;" onclick="changeColor('black', this)"></div>
+        <div class="color-btn" style="background: red;" onclick="changeColor('red', this)"></div>
+        <div class="color-btn active-color" style="background: blue;" onclick="changeColor('blue', this)"></div>
+        <div class="color-btn" style="background: green;" onclick="changeColor('green', this)"></div>
+        
+        <input type="range" class="size-picker" id="sizePicker" min="1" max="20" value="5">
+
+        <button class="clear-btn" onclick="clearCanvas()">مسح</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('paintCanvas');
+        const ctx = canvas.getContext('2d');
+        const sizePicker = document.getElementById('sizePicker');
+
+        // ضبط حجم اللوحة لملء الشاشة
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight - document.querySelector('.toolbar').offsetHeight;
+            // إعادة ضبط إعدادات القلم بعد تغيير الحجم
+            ctx.lineCap = 'round'; // جعل حواف الخط دائرية
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = currentSize;
+        }
+
+        // المتغيرات الأساسية للرسم
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let currentColor = 'blue';
+        let currentSize = 5;
+
+        // إعدادات البداية
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // استدعاء أولي
+
+        // --- وظائف الرسم ---
+
+        // بدء الرسم (عند لمس الشاشة)
+        function startDrawing(e) {
+            isDrawing = true;
+            // الحصول على إحداثيات اللمس أو الماوس
+            const { x, y } = getCoords(e);
+            [lastX, lastY] = [x, y];
+        }
+
+        // تحريك القلم (أثناء تحريك الإصبع)
+        function draw(e) {
+            if (!isDrawing) return; // لا ترسم إذا لم يكن الإصبع ملامساً
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY); // نقطة البداية
+
+            const { x, y } = getCoords(e);
+            ctx.lineTo(x, y); // نقطة النهاية
+            ctx.stroke(); // رسم الخط
+
+            [lastX, lastY] = [x, y]; // تحديث آخر نقطة
+        }
+
+        // التوقف عن الرسم
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        // الحصول على الإحداثيات الصحيحة (تعمل للموس واللمس)
+        function getCoords(e) {
+            let clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            // خصم مسافة الأوفست لو كان هناك هوامش (هنا لا توجد لكنها ممارسة جيدة)
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        // --- أدوات التحكم ---
+
+        // تغيير اللون
+        function changeColor(color, btnElement) {
+            currentColor = color;
+            ctx.strokeStyle = currentColor;
+
+            // تحديث الشكل (إزالة التميز من الزر القديم وإضافته للجديد)
+            document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active-color'));
+            btnElement.classList.add('active-color');
+        }
+
+        // تغيير حجم القلم
+        sizePicker.addEventListener('input', (e) => {
+            currentSize = e.target.value;
+            ctx.lineWidth = currentSize;
+        });
+
+        // مسح اللوحة بالكامل
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // --- مستمعي الأحداث (Event Listeners) لدعم اللمس والماوس ---
+
+        // أحداث اللمس (للهاتف)
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', draw);
+        window.addEventListener('touchend', stopDrawing);
+
+        // أحداث الماوس (للكمبيوتر لو جربته)
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        window.addEventListener('mouseup', stopDrawing);
+
+    </script>
+</body>
+</html>
+
